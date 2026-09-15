@@ -1,0 +1,10 @@
+name = "MultiscaleFilterBanks"
+uuid = "6efc46e8-ef8d-4233-93b5-7ad1cba20951"
+version = "0.1.0"
+authors = ["Tamás Hakkel"]
+
+[workspace]
+projects = ["test"]
+
+[compat]
+julia = "1.10"

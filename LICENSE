@@ -22,27 +22,16 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 
-THIRD-PARTY ATTRIBUTION
+THIRD-PARTY NOTICES
 
-Parts of this package are independent Julia reimplementations of algorithms from
-the following BSD-licensed MATLAB toolboxes.  No source code from these toolboxes
-is vendored into this repository; the directional filter bank (DFB) and
-nonsubsampled DFB, the "pkva" ladder filters, and the resampling / separable
-filtering helpers are ported from their published algorithms and function
-descriptions, so the original copyright and disclaimer are retained below as
-required by the BSD license.
+This package contains no source code from other software.  It implements
+published methods, each cited in the source file that implements it:
 
-* MATLAB Contourlet Toolbox
-  Copyright (c) Minh N. Do.
-  https://www.mathworks.com/matlabcentral/fileexchange/8837-contourlet-toolbox
-
-* MATLAB Nonsubsampled Contourlet Toolbox
-  Copyright (c) Arthur L. da Cunha, Jianping Zhou, and Minh N. Do.
-  https://www.mathworks.com/matlabcentral/fileexchange/10049-nonsubsampled-contourlet-toolbox
-
-Both toolboxes are distributed under the BSD license:
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the above copyright notice and this
-  list of conditions are retained.  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
-  HOLDERS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.
+* CDF 9/7 filters: A. Cohen, I. Daubechies and J.-C. Feauveau, "Biorthogonal
+  bases of compactly supported wavelets", Commun. Pure Appl. Math. 45(5), 1992,
+  with the coefficients of JPEG 2000 Part 1 (ISO/IEC 15444-1).
+* À trous filtering: M. Holschneider, R. Kronland-Martinet, J. Morlet and
+  Ph. Tchamitchian, "A real-time algorithm for signal analysis with the help of
+  the wavelet transform", in Wavelets, Time-Frequency Methods and Phase Space,
+  Springer, 1989; M. J. Shensa, "The discrete wavelet transform: wedding the à
+  trous and Mallat algorithms", IEEE Trans. Signal Process. 40(10), 1992.

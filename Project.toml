@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Tamás Hakkel"]
 
 [workspace]
-projects = ["test"]
+projects = ["test", "docs"]
 
 [compat]
 julia = "1.10"

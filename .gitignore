@@ -4,6 +4,7 @@
 **/Manifest.toml
 **/Manifest-v*.toml
 /.temp/
+/docs/build/
 lcov.info
 
 # Agentic tools

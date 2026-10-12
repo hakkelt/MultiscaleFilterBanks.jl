@@ -17,14 +17,18 @@ nonsubsampled and decimated surfacelet transforms):
 | `ThreadingPolicy`, `Auto`, `Enabled`, `Disabled` | Threading policy types |
 
 It also carries the internal helpers both downstream packages share: the
-element-type convention (`_data_eltype` / `_filter_eltype`), the split of
-independent FFT loops into threaded tasks (`_n_fft_tasks` / `_chunk`), the boundary
-index folding (`_clamp_idx`) and the à trous pyramid filter construction
-(`_nsp_atrous_filters`).
+element-type convention (`_data_eltype` / `_filter_eltype`), the threaded loop
+over independent FFTs (`_foreach_chunk` / `_chunked_sum!`), the scoped FFTW thread
+count (`_with_fftw_threads`), the boundary index folding (`_clamp_idx`) and the
+à trous pyramid filter construction (`_nsp_atrous_filters`).
 
-This package has no non-stdlib dependencies.
+Its only dependencies are Polyester (the task runner) and NestedThreading (the
+FFTW thread budget).
 """
 module MultiscaleFilterBanks
+
+using Polyester: @batch
+using NestedThreading: NestedThreading
 
 include("threading.jl")
 include("types.jl")
@@ -32,6 +36,12 @@ include("filter_utils.jl")
 include("cdf97.jl")
 include("boundary.jl")
 include("atrous.jl")
+
+function __init__()
+    _LOOP_THREADS[] = Threads.nthreads()
+    _register_loop_pool()
+    return nothing
+end
 
 export
     FilterPair,

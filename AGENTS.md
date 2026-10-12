@@ -27,8 +27,18 @@ for volumes, it belongs downstream.
 
 ## Invariants
 
-- **Zero non-stdlib dependencies.** Adding a dep here adds it to both downstream
-  packages. `LoopVectorization`, `Polyester`, `FFTW` deliberately stay downstream.
+- **Dependencies only where both downstream packages need them.** Adding a dep
+  here adds it to both. `Polyester` (the task runner of `_foreach_chunk`) and
+  `NestedThreading` (`_with_fftw_threads`) qualify; `LoopVectorization` and `FFTW`
+  deliberately stay downstream.
+- **`@batch` only where `_batch_safe()`.** Polyester's workers are pinned to
+  threads 2…nthreads(): from a task of a caller's threaded loop it ran ~100×
+  slower than `Threads.@threads`, and a busy second interactive thread stalls it.
+  `_foreach_chunk` falls back to `Threads.@threads` there; a new threaded loop
+  should go through it rather than call `@batch`.
+- **No `@batch` body may throw.** An exception escaping one leaves Polyester's
+  workers unusable, and every later `@batch` in the process runs serially without
+  a warning. `_foreach_chunk` catches and rethrows.
 - **Element types: real filters, real-or-complex data.** `FilterPair` is
   `Tf <: AbstractFloat`; data may be complex (`Td <: Number`). Downstream threads
   the two independently — `Td = _data_eltype(x)`, `Tf = _filter_eltype(Td) = real(float(Td))`

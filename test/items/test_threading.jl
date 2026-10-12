@@ -17,3 +17,28 @@ end
     @test Enabled <: ThreadingPolicy
     @test Disabled <: ThreadingPolicy
 end
+
+@testitem "_foreach_chunk / _chunked_sum! cover 1:n once" tags = [:primitives] begin
+    using MultiscaleFilterBanks: _foreach_chunk, _chunked_sum!, _chunk, _n_tasks
+    for n in (1, 5, 17), nt in (1, 2, 3, 4), threaded in (false, true)
+        seen = zeros(Int, n)
+        tasks = zeros(Int, n)
+        _foreach_chunk(n, nt, threaded) do range, t
+            seen[range] .+= 1
+            tasks[range] .= t
+        end
+        @test all(==(1), seen)
+        @test issorted(tasks)
+        acc = fill(1.0, 3)
+        partials = [zeros(3) for _ in 2:nt]
+        _chunked_sum!(acc, partials, n, threaded) do a, range, t
+            for i in range
+                a .+= i
+            end
+        end
+        # Unthreaded, task 1 sums everything into `acc` itself.
+        @test acc == fill(1.0 + n * (n + 1) ÷ 2, 3)
+    end
+    @test _n_tasks(zeros(2), 1) == 1
+    @test _n_tasks(zeros(2), 100) == Threads.nthreads()
+end

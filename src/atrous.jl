@@ -33,3 +33,40 @@ function _nsp_atrous_filters(fp::FilterPair, level::Int, ::Type{Tf}) where {Tf}
     g_j = Tf(_NSP_SYNTH_SCALE) .* (Tf === eltype(g_up) ? g_up : Tf.(g_up))
     return h_j, g_j
 end
+
+# DTFT at θ of a filter whose centre tap sits at `(length + 1) ÷ 2`: the
+# frequency response of the periodic, centred convolution the pyramids apply.
+function _centred_dtft(f::AbstractVector, θ::Real)
+    c = (length(f) + 1) ÷ 2
+    return sum(f[l] * cis(-θ * (l - c)) for l in eachindex(f))
+end
+
+"""
+    _nsp_responses(fp, J, n; bins=1:n) -> (a, gh, s)
+
+The `J`-level nonsubsampled pyramid on one `n`-point DFT axis, as frequency
+responses at the bins `bins` (`ComplexF64` vectors).  With Hⱼ, Gⱼ the responses
+of the level-j à trous pair,
+
+    a[j] = Π_{i<j} Hᵢ  (j ≤ J + 1),   gh[j] = Gⱼ Hⱼ  (j ≤ J),   s[j] = Π_{i<j} Gᵢ  (j ≤ J + 1).
+
+Periodic separable filtering is a pointwise product on the DFT grid, so on a
+D-dimensional grid the bandpass of level j is `Π_d a_d[j] · (1 − Π_d gh_d[j])`,
+the lowpass `Π_d a_d[J + 1]`, and their synthesis masks `Π_d s_d[j]`; with them
+`Σⱼ synthesis · analysis = 1` telescopes.  Each mask is a broadcast of per-axis
+vectors, never stored at full size.
+"""
+function _nsp_responses(fp::FilterPair, J::Int, n::Int; bins = 1:n)
+    a = [ones(ComplexF64, length(bins))]
+    s = [ones(ComplexF64, length(bins))]
+    gh = Vector{ComplexF64}[]
+    for j in 1:J
+        h, g = _nsp_atrous_filters(fp, j, Float64)
+        H = [_centred_dtft(h, 2π * (k - 1) / n) for k in bins]
+        G = [_centred_dtft(g, 2π * (k - 1) / n) for k in bins]
+        push!(gh, G .* H)
+        push!(a, a[end] .* H)
+        push!(s, s[end] .* G)
+    end
+    return a, gh, s
+end

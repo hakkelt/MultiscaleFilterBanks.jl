@@ -2,19 +2,20 @@
 
 This file guides AI agents (and human contributors) through the repository
 structure and the conventions that are *specific to this package*. General Julia
-best practices live in the skills under `.agents/skills/` and are not repeated here.
+practice is not repeated here.
 
 ## What this package is
 
-The shared core of a three-package family:
+The shared core of a package family:
 
 ```
-MultiscaleFilterBanks.jl   ← this package (no non-stdlib deps)
+MultiscaleFilterBanks.jl   ← this package
         ├── Contourlets.jl   (2-D CT / NSCT)
-        └── Surfacelets.jl   (3-D nonsubsampled + decimated surfacelet transform)
+        ├── Surfacelets.jl   (3-D nonsubsampled + decimated surfacelet transform)
+        └── Shearlets.jl     (2-D and 3-D shearlets)
 ```
 
-Both downstream packages depend on this one; neither depends on the other. Nothing
+The downstream packages depend on this one; none depends on another. Nothing
 here may be dimension-specific — if a change only makes sense for matrices or only
 for volumes, it belongs downstream.
 
@@ -27,10 +28,16 @@ for volumes, it belongs downstream.
 
 ## Invariants
 
-- **Dependencies only where both downstream packages need them.** Adding a dep
-  here adds it to both. `Polyester` (the task runner of `_foreach_chunk`) and
-  `NestedThreading` (`_with_fftw_threads`) qualify; `LoopVectorization` and `FFTW`
-  deliberately stay downstream.
+- **Dependencies only where the downstream packages need them.** Adding a dep
+  here adds it to all of them. `Polyester` (the task runner of `_foreach_chunk`),
+  `NestedThreading` (`_with_fftw_threads`) and `FastBroadcast` (the engine's
+  same-size products) qualify; `LoopVectorization` and `FFTW` deliberately stay
+  downstream — the engine takes its FFT plans from the caller.
+- **The mask-bank engine (`mask_bank.jl`) is dimension-agnostic.** It knows
+  nothing of coefficient containers: downstream packages add `_subband` (and,
+  if the lowpass is not a `coarse` field, `_coarse`) methods. Its bank paths are
+  broadcast + FFT only and allocate nothing — Contourlets' CUDA graph capture of
+  the NSCT relies on it.
 - **`@batch` only where `_batch_safe()`.** Polyester's workers are pinned to
   threads 2…nthreads(): from a task of a caller's threaded loop it ran ~100×
   slower than `Threads.@threads`, and a busy second interactive thread stalls it.

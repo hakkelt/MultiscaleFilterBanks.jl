@@ -41,3 +41,13 @@ struct Disabled <: ThreadingPolicy end
     # By default, disabled for Real, enabled for Complex.
     return !(T <: Real)
 end
+
+# ── Task partitioning ───────────────────────────────────────────────────────────
+
+# Tasks a loop over independent FFTs can split into: one per thread on the host,
+# one on a device (whose FFTs are already parallel).
+_n_fft_tasks(::Array) = Threads.nthreads()
+_n_fft_tasks(::AbstractArray) = 1
+
+# Items of the `t`-th of `nt` contiguous, balanced chunks of `1:n`.
+_chunk(n::Int, nt::Int, t::Int) = (div((t - 1) * n, nt) + 1):div(t * n, nt)

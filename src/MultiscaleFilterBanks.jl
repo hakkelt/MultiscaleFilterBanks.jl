@@ -17,7 +17,8 @@ nonsubsampled and decimated surfacelet transforms):
 | `ThreadingPolicy`, `Auto`, `Enabled`, `Disabled` | Threading policy types |
 
 It also carries the internal helpers both downstream packages share: the
-element-type convention (`_data_eltype` / `_filter_eltype`), the boundary
+element-type convention (`_data_eltype` / `_filter_eltype`), the split of
+independent FFT loops into threaded tasks (`_n_fft_tasks` / `_chunk`), the boundary
 index folding (`_clamp_idx`) and the à trous pyramid filter construction
 (`_nsp_atrous_filters`).
 

@@ -18,29 +18,11 @@ Both downstream packages depend on this one; neither depends on the other. Nothi
 here may be dimension-specific — if a change only makes sense for matrices or only
 for volumes, it belongs downstream.
 
-## Repository Layout
-
-```
-MultiscaleFilterBanks/
-├── src/
-│   ├── MultiscaleFilterBanks.jl  # module — all exports here
-│   ├── threading.jl              # ThreadingPolicy / Auto / Enabled / Disabled
-│   ├── types.jl                  # FilterPair, _data_eltype, _filter_eltype
-│   ├── filter_utils.jl           # upsample_filter
-│   ├── cdf97.jl                  # CDF 9/7 LP filter constants
-│   ├── boundary.jl               # _clamp_idx (symmetric / periodic / zero)
-│   └── atrous.jl                 # _NSP_SYNTH_SCALE, _nsp_atrous_filters
-├── test/
-│   ├── runtests.jl               # TestItemRunner entry point
-│   └── items/
-└── scripts/relint.jl
-```
-
 ## Commit Rules
 
 - **Commit Message Formatting**: "Conventional Commits" — `type(scope): subject`,
   then a blank line and a detailed description. Always append a co-author line
-  referencing yourself. Do **not** add a `Claude-Session:` trailer line.
+  referencing yourself.
 - **Committing Changes**: ONLY commit code upon explicit instruction from the user.
 
 ## Invariants

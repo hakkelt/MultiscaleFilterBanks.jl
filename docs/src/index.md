@@ -21,24 +21,31 @@ it with figures.
 | [Surfacelets.jl](https://github.com/hakkelt/Surfacelets.jl) | 3-D surfacelet transform: nonsubsampled, decimated and semi-translation-invariant forms |
 | [Shearlets.jl](https://github.com/hakkelt/Shearlets.jl) | 2-D and 3-D shearlet transforms: band-limited (FFST), nonsubsampled (NSST) and compactly supported |
 
-All three re-export its filter types, so most users never load it directly. Load it to write a new transform of the same kind, or to use the
-pyramid filters on their own.
+All three re-export its filter types, so most users never load it directly. Load
+it to write a new transform of the same kind, or to use the pyramid filters on
+their own.
 
 ## What it provides
 
-- [`FilterPair`](@ref): a 1-D biorthogonal analysis/synthesis low-pass filter
-  pair, and [`CDF97`](@ref), the CDF 9/7 pair of JPEG 2000 that the pyramids use
-  by default.
-- [`upsample_filter`](@ref): the à trous filter upsampling of the nonsubsampled
-  (shift-invariant) pyramids and directional banks.
-- [`MaskBankEngine`](@ref): the engine that runs a nonsubsampled pyramid plus
-  directional banks as pointwise products on the DFT grid, in any dimension.
-- The threaded loop over independent FFTs ([`foreach_chunk`](@ref)) and the
-  helpers for element types and boundary extension.
+- **Filters**: the biorthogonal pyramid filter pair [`FilterPair`](@ref), its
+  default [`CDF97`](@ref), and à trous upsampling with [`upsample_filter`](@ref).
+- **Nonsubsampled pyramid**: the filters of each level
+  ([`nsp_atrous_filters`](@ref)) and their frequency responses on the DFT grid
+  ([`nsp_responses`](@ref)).
+- **Mask-bank engine**: [`MaskBankEngine`](@ref) runs a nonsubsampled pyramid
+  followed by directional filter banks as pointwise products on the DFT grid, in
+  any dimension and on CPU or GPU arrays.
+- **Threading**: the threaded loop over independent subbands
+  ([`foreach_chunk`](@ref)) and the resolution of the transforms' `threaded`
+  keyword ([`use_threading`](@ref)).
+- **Utilities**: element-type rules for real filters on real or complex data
+  ([`data_eltype`](@ref)) and boundary extension ([`clamp_idx`](@ref)).
 
-The package exports nothing, so `using MultiscaleFilterBanks` cannot clash with
-other packages; every name in the [API Reference](api.md) is declared `public`.
-Load the ones you need explicitly:
+The [Theory](@ref theory) page explains the filters, the pyramid and the engine
+with figures. The [API Reference](api.md) lists everything.
+
+The package exports nothing, so using MultiscaleFilterBanks` cannot clash with
+other packages; every name is declared `public`. Load the ones you need explicitly:
 
 ```jldoctest
 julia> using MultiscaleFilterBanks: CDF97, upsample_filter
@@ -60,37 +67,34 @@ julia> upsample_filter([1.0, 2.0, 3.0], 2)
 A filter bank's subbands are independent, so the transforms built on this package
 compute them in parallel across Julia threads (start Julia with `-t auto`). Every
 transform takes a `threaded` keyword: `true` to thread, `false` to run serially,
-or `nothing` (the default) to let the transform decide. The threaded loop splits the subbands, not the FFTs: each task runs a contiguous
-chunk of subbands with its own buffers. It uses Polyester's low-overhead `@batch`
-when called from the main task (on Julia 1.12 and later, with one interactive
-thread) and `Threads.@threads` from anywhere else, so a transform called inside
-your own threaded loop stays fast.
-
-The loop's thread budget is registered with
-[NestedThreading.jl](https://github.com/hakkelt/NestedThreading.jl). Inside a
-`@budgeted_threads` loop or a `with_restricted_threads` scope the transforms run
-serially instead of oversubscribing the machine, and FFTW plans made inside such a
-scope are single-threaded.
+or `nothing` (the default) to let the transform decide. The threaded loop splits
+the subbands, not the FFTs: each task runs a contiguous chunk of subbands with its
+own buffers. It uses Polyester's low-overhead `@batch` when called from the main
+task (on Julia 1.12 and later, with one interactive thread) and `Threads.@threads`
+from anywhere else, so a transform called inside your own threaded loop stays
+fast.
 
 ## GPU support
 
-The nonsubsampled transforms run as products of precomputed masks on the DFT
-grid: broadcasts and FFT plans that the caller supplies. Nothing in that path is
-specific to `Array`, so the downstream transforms accept GPU arrays such as
-`CuArray` and run on the device, with one task per transform since the device FFTs
-are already parallel. The path allocates nothing per call, which lets
-Contourlets.jl capture its NSCT in a CUDA graph.
+The downstream transforms run on these GPUArrays backends:
 
-## Dependencies
+| Backend | Array type | Devices |
+|---------|------------|---------|
+| [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl) | `CuArray` | NVIDIA GPUs |
+| [AMDGPU.jl](https://github.com/JuliaGPU/AMDGPU.jl) | `ROCArray` | AMD GPUs |
+| [Metal.jl](https://github.com/JuliaGPU/Metal.jl) | `MtlArray` | Apple silicon GPUs |
+| [oneAPI.jl](https://github.com/JuliaGPU/oneAPI.jl) | `oneArray` | Intel GPUs |
+| [OpenCL.jl](https://github.com/JuliaGPU/OpenCL.jl) | `CLArray` | any OpenCL device |
+| [JLArrays.jl](https://github.com/JuliaGPU/GPUArrays.jl/tree/master/lib/JLArrays) | `JLArray` | CPU reference backend, for testing |
 
-Besides the standard library, the package depends on
-[Polyester.jl](https://github.com/JuliaSIMD/Polyester.jl) (the task runner),
-[NestedThreading.jl](https://github.com/hakkelt/NestedThreading.jl) (the thread
-budget) and [FastBroadcast.jl](https://github.com/YingboMa/FastBroadcast.jl) (the
-engine's same-size products). FFTW is deliberately not a dependency: the engine
-takes its FFT plans from the caller.
+The test suites run on CUDA, OpenCL and JLArrays. Move a transform's workspace to
+the device with Adapt.jl and pass device arrays, for example with Shearlets.jl:
 
-## References
+```julia
+using Shearlets, CUDA, Adapt
 
-See the [Theory](@ref theory) page and the docstrings of [`FilterPair`](@ref),
-[`CDF97`](@ref) and [`upsample_filter`](@ref).
+x = randn(Float32, 256, 256)
+sys = BandlimitedShearlets(scales = 4)
+ws = Adapt.adapt(CuArray, make_shearlet_workspace(Float32, size(x), sys))
+c = shearlet_forward(CuArray(x), sys; workspace = ws)
+```

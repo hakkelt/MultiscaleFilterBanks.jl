@@ -90,7 +90,7 @@ scope and cannot clash with other packages. Every name below is declared
 | `mask_bank_forward!`, `mask_bank_inverse!` | functions | Run a `MaskBankEngine` (analysis, synthesis) |
 | `mask_bank_subband`, `mask_bank_coarse` | functions | Extension points: where a coefficient container keeps a subband and its lowpass |
 | `use_threading` | function | Resolve a transform's `threaded` keyword for an element type |
-| `loop_threaded` | function | Whether a threaded call may thread under the NestedThreading budget |
+| `loop_threaded` | function | Whether a threaded call may thread inside an enclosing thread budget |
 | `foreach_chunk`, `chunked_sum!`, `add_partials!` | functions | The threaded loop over independent FFTs, and its sum |
 | `n_tasks` | function | Task count of such a loop for an array type |
 | `with_fftw_threads` | function | Make FFTW plans with a scoped thread count |
@@ -102,28 +102,32 @@ scope and cannot clash with other packages. Every name below is declared
 The transforms built on this package compute their subbands independently, so
 they run them in parallel across Julia threads (start Julia with `-t auto`). Each
 transform takes a `threaded` keyword: `true` to thread, `false` to run serially,
-or `nothing` (the default) to let the transform decide. The threaded loop:
-
-- splits the subbands, not the FFTs: each task runs a contiguous chunk with its
-  own FFT buffers, so it needs no locks;
-- uses Polyester's low-overhead `@batch` when called from the main task (on
-  Julia 1.12 and later, with one interactive thread) and `Threads.@threads`
-  anywhere else, so calling a transform from inside your own threaded loop stays
-  fast;
-- registers its thread budget with
-  [NestedThreading.jl](https://github.com/hakkelt/NestedThreading.jl): inside a
-  `@budgeted_threads` loop or a `with_restricted_threads` scope it runs serially
-  instead of oversubscribing the machine, and FFTW plans made inside such a scope
-  are single-threaded too.
+or `nothing` (the default) to let the transform decide.
 
 ## GPU support
 
-The nonsubsampled transforms run as pointwise products of precomputed masks on
-the DFT grid: broadcasts plus FFT plans supplied by the caller. Nothing in that
-path is specific to `Array`, so the downstream transforms accept GPU arrays (for
-example `CuArray` with CUDA.jl) and run on the device, one task per transform
-since the device FFTs are already parallel. The path allocates nothing per call,
-which lets Contourlets.jl capture its NSCT in a CUDA graph.
+The downstream transforms run on these GPUArrays backends:
+
+| Backend | Array type | Devices |
+|---------|------------|---------|
+| [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl) | `CuArray` | NVIDIA GPUs |
+| [AMDGPU.jl](https://github.com/JuliaGPU/AMDGPU.jl) | `ROCArray` | AMD GPUs |
+| [Metal.jl](https://github.com/JuliaGPU/Metal.jl) | `MtlArray` | Apple silicon GPUs |
+| [oneAPI.jl](https://github.com/JuliaGPU/oneAPI.jl) | `oneArray` | Intel GPUs |
+| [OpenCL.jl](https://github.com/JuliaGPU/OpenCL.jl) | `CLArray` | any OpenCL device |
+| [JLArrays.jl](https://github.com/JuliaGPU/GPUArrays.jl/tree/master/lib/JLArrays) | `JLArray` | CPU reference backend, for testing |
+
+The test suites run on CUDA, OpenCL and JLArrays. Move a transform's workspace to
+the device with Adapt.jl and pass device arrays, for example with Shearlets.jl:
+
+```julia
+using Shearlets, CUDA, Adapt
+
+x = randn(Float32, 256, 256)
+sys = BandlimitedShearlets(scales = 4)
+ws = Adapt.adapt(CuArray, make_shearlet_workspace(Float32, size(x), sys))
+c = shearlet_forward(CuArray(x), sys; workspace = ws)
+```
 
 ## Element types
 

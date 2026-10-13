@@ -4,15 +4,6 @@ CurrentModule = MultiscaleFilterBanks
 
 # [Theory](@id theory)
 
-This page explains the parts of a multiscale, multidirectional transform that
-MultiscaleFilterBanks.jl provides: the biorthogonal filter pair, the Laplacian
-pyramid built from it, its nonsubsampled (*à trous*) form and how that pyramid
-runs as products on the DFT grid. The directional stages are specific to each
-transform and are explained by the downstream packages
-([Contourlets.jl](https://github.com/hakkelt/Contourlets.jl),
-[Surfacelets.jl](https://github.com/hakkelt/Surfacelets.jl),
-[Shearlets.jl](https://github.com/hakkelt/Shearlets.jl)).
-
 ```@setup theory
 using Plots
 Plots.default(show = false, size = (700, 380), lw = 2, fontfamily = "sans-serif")

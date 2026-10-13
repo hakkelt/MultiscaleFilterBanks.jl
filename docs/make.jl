@@ -1,6 +1,9 @@
 using Documenter, MultiscaleFilterBanks
 using Documenter: Remotes
 
+# GR (the Plots backend of the theory page) must not open a window.
+ENV["GKSwstype"] = "100"
+
 DocMeta.setdocmeta!(
     MultiscaleFilterBanks, :DocTestSetup,
     :(using MultiscaleFilterBanks, Random); recursive = true
@@ -18,9 +21,10 @@ makedocs(;
     ),
     pages = [
         "Home" => "index.md",
+        "Theory" => "theory.md",
         "API Reference" => "api.md",
     ],
-    checkdocs = :exports,
+    checkdocs = :public,
 )
 
 deploydocs(;

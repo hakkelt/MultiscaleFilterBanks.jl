@@ -1,11 +1,34 @@
-# Boundary extension helpers shared by the 2-D and 3-D convolution primitives.
-#
-# All helpers take the boundary mode `B` as a `Val` type parameter so the compiler
-# emits fully specialised code with no dispatch overhead per call.
-# The symmetric helper uses an in-range fast path (skips mod for interior
-# samples) followed by a branch-free abs-fold for out-of-range indices.
+"""
+    clamp_idx(i, n, Val(mode)) -> Int
 
-@inline function _clamp_idx(i::Int, n::Int, ::Val{:symmetric})::Int
+Fold the index `i` into `1:n` for the boundary extension `mode` of a signal of
+length `n`:
+
+- `:symmetric`: whole-sample symmetric, the edge sample is not repeated
+  (`x[2], x[1], x[2], x[3], …`);
+- `:periodic`: `mod1(i, n)`;
+- `:zero`: `i` unchanged; the caller treats indices outside `1:n` as zeros.
+
+The mode is a `Val` so each caller is specialised, with no per-sample dispatch.
+
+```jldoctest
+julia> using MultiscaleFilterBanks: clamp_idx
+
+julia> [clamp_idx(i, 4, Val(:symmetric)) for i in -1:6]
+8-element Vector{Int64}:
+ 3
+ 2
+ 1
+ 2
+ 3
+ 4
+ 3
+ 2
+```
+"""
+function clamp_idx end
+
+@inline function clamp_idx(i::Int, n::Int, ::Val{:symmetric})::Int
     1 <= i <= n && return i
     n == 1 && return 1
     p = 2 * (n - 1)
@@ -13,10 +36,10 @@
     return n - abs(m - (n - 1))
 end
 
-@inline function _clamp_idx(i::Int, n::Int, ::Val{:periodic})::Int
+@inline function clamp_idx(i::Int, n::Int, ::Val{:periodic})::Int
     return mod(i - 1, n) + 1
 end
 
-@inline function _clamp_idx(i::Int, n::Int, ::Val{:zero})::Int
+@inline function clamp_idx(i::Int, n::Int, ::Val{:zero})::Int
     return i
 end

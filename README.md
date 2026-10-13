@@ -1,31 +1,142 @@
 # MultiscaleFilterBanks.jl
 
-Shared building blocks for multiscale, multidirectional filter-bank transforms.
+[![CI](https://github.com/hakkelt/MultiscaleFilterBanks.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/hakkelt/MultiscaleFilterBanks.jl/actions/workflows/CI.yml)
+[![Lint](https://github.com/hakkelt/MultiscaleFilterBanks.jl/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/hakkelt/MultiscaleFilterBanks.jl/actions/workflows/lint.yml)
+[![Documentation (stable)](https://img.shields.io/badge/docs-stable-blue.svg)](https://hakkelt.github.io/MultiscaleFilterBanks.jl/stable/)
+[![Documentation (dev)](https://img.shields.io/badge/docs-dev-blue.svg)](https://hakkelt.github.io/MultiscaleFilterBanks.jl/dev/)
+[![Coverage](https://codecov.io/gh/hakkelt/MultiscaleFilterBanks.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/hakkelt/MultiscaleFilterBanks.jl)
+[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![JET](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
+[![Runic](https://img.shields.io/badge/code%20style-runic-blue.svg)](https://github.com/fredrikekre/Runic.jl)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-This package holds the pieces that are neither 2-D nor 3-D specific and are used by
-both [Contourlets.jl](https://github.com/hakkelt/Contourlets.jl) (the 2-D contourlet
-and nonsubsampled contourlet transform) and
-[Surfacelets.jl](https://github.com/hakkelt/Surfacelets.jl) (the 3-D nonsubsampled
-and decimated surfacelet transforms).
+The shared core of a family of multiscale, multidirectional transforms for images
+and volumes:
 
-| Export | Description |
-|--------|-------------|
-| `FilterPair` | 1-D biorthogonal analysis/synthesis low-pass filter pair |
-| `CDF97` | The CDF 9/7 filter pair used by the pyramid stages |
-| `upsample_filter` | À trous ("with holes") filter upsampling |
-| `ThreadingPolicy`, `Auto`, `Enabled`, `Disabled` | Threading policy types |
+| Package | Transforms |
+|---------|------------|
+| [Contourlets.jl](https://github.com/hakkelt/Contourlets.jl) | 2-D contourlet (CT), nonsubsampled contourlet (NSCT), translation-invariant (TICT) and semi-translation-invariant (STICT) contourlet transforms |
+| [Surfacelets.jl](https://github.com/hakkelt/Surfacelets.jl) | 3-D surfacelet transform: nonsubsampled, decimated and semi-translation-invariant forms |
+| [Shearlets.jl](https://github.com/hakkelt/Shearlets.jl) | 2-D and 3-D shearlet transforms: band-limited (FFST), nonsubsampled (NSST) and compactly supported |
 
-It also carries the internal helpers both downstream packages share: the element-type
-convention (`_data_eltype` / `_filter_eltype`), the boundary index folding
-(`_clamp_idx`) and the à trous pyramid filter construction (`_nsp_atrous_filters`).
+Most users never load this package directly: all three re-export its filter
+types. It is for writing a new transform of the same kind, or for using the
+pyramid filters on their own.
 
-There are no non-stdlib dependencies.
+## What is a multiscale filter bank?
+
+A wavelet transform splits a signal by *scale*: each level separates the details
+of one frequency octave from a coarser approximation. In two and more dimensions
+the separable wavelet sees only horizontal, vertical and diagonal detail, so a
+curved edge costs many coefficients at every scale. Multiscale, multidirectional
+transforms fix that by splitting each octave further by *orientation*:
+
+1. A **pyramid** (multiscale stage) splits the input into a bandpass and a
+   coarser lowpass, and repeats on the lowpass. The analysis low-pass `h` produces
+   the lowpass; the synthesis low-pass `g` predicts the input from it, and the
+   bandpass is what the prediction misses (the Laplacian pyramid of Burt and
+   Adelson). With the *à trous* variant nothing is decimated, so the transform is
+   invariant to shifts.
+2. A **directional filter bank** (multidirectional stage) splits each bandpass
+   into wedges of orientation in the frequency plane (contourlets), in frequency
+   space (surfacelets), or into sheared copies of one generator (shearlets).
+
+Every subband then holds edges of one scale and one direction, which makes these
+transforms sparser than wavelets for images and volumes with edges and surfaces,
+and useful for denoising, enhancement, compression and compressed-sensing
+reconstruction. This package provides the parts the three transforms share; the
+[theory page](https://hakkelt.github.io/MultiscaleFilterBanks.jl/stable/theory/)
+of the documentation explains them with figures.
+
+## Installation
+
+```julia
+using Pkg
+Pkg.add("MultiscaleFilterBanks")
+```
+
+## Quick example
+
+```julia
+using MultiscaleFilterBanks: FilterPair, CDF97, upsample_filter
+
+CDF97                                  # FilterPair{Float64}: 9-tap h, 7-tap g
+sum(CDF97.h), sum(CDF97.g)             # ≈ (1, 2): DC gains of analysis and synthesis
+upsample_filter(CDF97.h, 4)            # level-3 à trous filter: 3 zeros between taps
+
+fp = FilterPair([0.5, 1.0, 0.5] ./ 2, [0.5, 1.0, 0.5])   # a custom pair (linear spline)
+```
+
+The downstream packages take the pair as a parameter, e.g.
+`ContourletParams(...; lp_filters = fp)` in Contourlets.jl or
+`NSSTShearlets(; pyramid = fp)` in Shearlets.jl.
+
+## Public API
+
+The package exports nothing, so `using MultiscaleFilterBanks` brings no names into
+scope and cannot clash with other packages. Every name below is declared
+`public`; load the ones you need explicitly, as in the example above.
+
+| Name | Kind | Description |
+|------|------|-------------|
+| `FilterPair` | type | 1-D biorthogonal analysis/synthesis low-pass filter pair |
+| `CDF97` | constant | The CDF 9/7 pair (JPEG 2000) used by the pyramid stages by default |
+| `upsample_filter` | function | À trous filter upsampling: insert `factor - 1` zeros between taps |
+| `nsp_atrous_filters` | function | Analysis/synthesis filters of one nonsubsampled-pyramid level |
+| `nsp_responses` | function | Frequency responses of a `J`-level nonsubsampled pyramid on one DFT axis |
+| `centred_dtft` | function | Frequency response of a centred filter |
+| `MaskBankEngine` | type | Nonsubsampled pyramid plus directional banks as products on the DFT grid |
+| `MaskItem` | type | One output of a `MaskBankEngine` |
+| `mask_bank_forward!`, `mask_bank_inverse!` | functions | Run a `MaskBankEngine` (analysis, synthesis) |
+| `mask_bank_subband`, `mask_bank_coarse` | functions | Extension points: where a coefficient container keeps a subband and its lowpass |
+| `use_threading` | function | Resolve a transform's `threaded` keyword for an element type |
+| `loop_threaded` | function | Whether a threaded call may thread under the NestedThreading budget |
+| `foreach_chunk`, `chunked_sum!`, `add_partials!` | functions | The threaded loop over independent FFTs, and its sum |
+| `n_tasks` | function | Task count of such a loop for an array type |
+| `with_fftw_threads` | function | Make FFTW plans with a scoped thread count |
+| `data_eltype`, `filter_eltype` | functions | Element types for data and the real filters applied to it |
+| `clamp_idx` | function | Boundary index folding (symmetric, periodic, zero) |
+
+## Multithreading
+
+The transforms built on this package compute their subbands independently, so
+they run them in parallel across Julia threads (start Julia with `-t auto`). Each
+transform takes a `threaded` keyword: `true` to thread, `false` to run serially,
+or `nothing` (the default) to let the transform decide. The threaded loop:
+
+- splits the subbands, not the FFTs: each task runs a contiguous chunk with its
+  own FFT buffers, so it needs no locks;
+- uses Polyester's low-overhead `@batch` when called from the main task (on
+  Julia 1.12 and later, with one interactive thread) and `Threads.@threads`
+  anywhere else, so calling a transform from inside your own threaded loop stays
+  fast;
+- registers its thread budget with
+  [NestedThreading.jl](https://github.com/hakkelt/NestedThreading.jl): inside a
+  `@budgeted_threads` loop or a `with_restricted_threads` scope it runs serially
+  instead of oversubscribing the machine, and FFTW plans made inside such a scope
+  are single-threaded too.
+
+## GPU support
+
+The nonsubsampled transforms run as pointwise products of precomputed masks on
+the DFT grid: broadcasts plus FFT plans supplied by the caller. Nothing in that
+path is specific to `Array`, so the downstream transforms accept GPU arrays (for
+example `CuArray` with CUDA.jl) and run on the device, one task per transform
+since the device FFTs are already parallel. The path allocates nothing per call,
+which lets Contourlets.jl capture its NSCT in a CUDA graph.
+
+## Element types
+
+Filters are real (`Float32` or `Float64`); data may be real or complex. Complex
+data is filtered with real kernels, so every transform is exactly real-linear:
+`T(x + im*y) == T(x) + im*T(y)`.
 
 ## Development
 
 ```bash
 julia --project=test test/runtests.jl          # all tests
 julia --project=test test/runtests.jl :filters # filter by tag or item name
+julia --project=docs docs/make.jl              # build the documentation
 ```
 
 Formatting and static analysis are mandatory before committing:
@@ -35,9 +146,11 @@ runic src/
 JULIA_LOAD_PATH="@relint:@stdlib" julia --startup-file=no scripts/relint.jl src/
 ```
 
-## Status
+## Disclaimer
 
-This package is not registered yet. Downstream packages resolve it through
-`Pkg.develop(path = ...)` (see their `dev/bootstrap.jl`). Before CI can go green on
-GitHub, the repository needs `CODECOV_TOKEN` set, and dependents need either
-registration or `Pkg.develop(url = ...)` in their CI setup step.
+This package was created by [Claude](https://claude.com/claude-code), Anthropic's
+AI model, under the direction of the author.
+
+## License
+
+MIT; see [`LICENSE`](LICENSE).

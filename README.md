@@ -71,31 +71,26 @@ The downstream packages take the pair as a parameter, e.g.
 `ContourletParams(...; lp_filters = fp)` in Contourlets.jl or
 `NSSTShearlets(; pyramid = fp)` in Shearlets.jl.
 
-## Public API
+## What it provides
 
-The package exports nothing, so `using MultiscaleFilterBanks` brings no names into
-scope and cannot clash with other packages. Every name below is declared
-`public`; load the ones you need explicitly, as in the example above.
+- **Filters**: the biorthogonal pyramid filter pair `FilterPair`, its default
+  `CDF97`, and à trous upsampling with `upsample_filter`.
+- **Nonsubsampled pyramid**: the filters of each level and their frequency
+  responses on the DFT grid.
+- **Mask-bank engine**: `MaskBankEngine` runs a nonsubsampled pyramid followed by
+  directional filter banks as pointwise products on the DFT grid, in any
+  dimension and on CPU or GPU arrays.
+- **Threading**: the threaded loop over independent subbands and the resolution
+  of the transforms' `threaded` keyword.
+- **Utilities**: element-type rules for real filters on real or complex data, and
+  boundary extension.
 
-| Name | Kind | Description |
-|------|------|-------------|
-| `FilterPair` | type | 1-D biorthogonal analysis/synthesis low-pass filter pair |
-| `CDF97` | constant | The CDF 9/7 pair (JPEG 2000) used by the pyramid stages by default |
-| `upsample_filter` | function | À trous filter upsampling: insert `factor - 1` zeros between taps |
-| `nsp_atrous_filters` | function | Analysis/synthesis filters of one nonsubsampled-pyramid level |
-| `nsp_responses` | function | Frequency responses of a `J`-level nonsubsampled pyramid on one DFT axis |
-| `centred_dtft` | function | Frequency response of a centred filter |
-| `MaskBankEngine` | type | Nonsubsampled pyramid plus directional banks as products on the DFT grid |
-| `MaskItem` | type | One output of a `MaskBankEngine` |
-| `mask_bank_forward!`, `mask_bank_inverse!` | functions | Run a `MaskBankEngine` (analysis, synthesis) |
-| `mask_bank_subband`, `mask_bank_coarse` | functions | Extension points: where a coefficient container keeps a subband and its lowpass |
-| `use_threading` | function | Resolve a transform's `threaded` keyword for an element type |
-| `loop_threaded` | function | Whether a threaded call may thread inside an enclosing thread budget |
-| `foreach_chunk`, `chunked_sum!`, `add_partials!` | functions | The threaded loop over independent FFTs, and its sum |
-| `n_tasks` | function | Task count of such a loop for an array type |
-| `with_fftw_threads` | function | Make FFTW plans with a scoped thread count |
-| `data_eltype`, `filter_eltype` | functions | Element types for data and the real filters applied to it |
-| `clamp_idx` | function | Boundary index folding (symmetric, periodic, zero) |
+The [theory page](https://hakkelt.github.io/MultiscaleFilterBanks.jl/stable/theory/)
+explains the filters, the pyramid and the engine with figures, and the
+[API reference](https://hakkelt.github.io/MultiscaleFilterBanks.jl/stable/api/)
+lists everything. The package exports nothing, so `using MultiscaleFilterBanks`
+cannot clash with other packages; every name is declared `public`. Load the ones
+you need explicitly, as in the example above.
 
 ## Multithreading
 

@@ -44,7 +44,7 @@ their own.
 The [Theory](@ref theory) page explains the filters, the pyramid and the engine
 with figures. The [API Reference](api.md) lists everything.
 
-The package exports nothing, so using MultiscaleFilterBanks` cannot clash with
+The package exports nothing, so `using MultiscaleFilterBanks` cannot clash with
 other packages; every name is declared `public`. Load the ones you need explicitly:
 
 ```jldoctest
